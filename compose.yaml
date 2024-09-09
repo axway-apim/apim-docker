@@ -1,0 +1,62 @@
+services:
+  cassandra:
+    image: cassandra:4.1.5
+    container_name: cassandra
+    hostname: cassandra
+    ports:
+      - 9042:9042
+    environment:
+      - CASSANDRA_PASSWORD=admin
+      - CASSANDRA_USER=admin
+    healthcheck:
+      test: ["CMD-SHELL", "[ $$(nodetool statusgossip) = running ]"]
+    networks: 
+      - apim
+    volumes:
+      - ./cassandra:/var/lib/cassandra
+  
+  node-manager:
+    image: ADMIN_NODE_MANAGER_IMAGE
+    container_name: anm
+    hostname: anm
+    ports: 
+      - 8090:8090
+    networks:
+      - apim
+    volumes:
+      - ./merge:/merge
+    environment:
+      - ACCEPT_GENERAL_CONDITIONS=yes
+    depends_on: 
+      cassandra:
+        condition: service_healthy
+  
+  gateway:
+    image: GATEWAY_IMAGE
+    container_name: apimgr
+    hostname: apimgr
+    ports:
+      - 8065:8065
+      - 8075:8075
+      - 8080:8080
+    networks:
+      - apim
+    volumes:
+      - ./merge:/merge
+    environment:
+      - CASS_HOST=cassandra
+      - ACCEPT_GENERAL_CONDITIONS=yes
+      - EMT_ANM_HOSTS=anm:8090
+      - CASS_PASSWORD=admin
+      - CASS_USERNAME=admin
+      - CASS_KEYSPACE=myspace
+      - CASS_TKEYSPACE=t_myspace
+    depends_on:
+      cassandra:
+        condition: service_healthy
+      node-manager:
+        condition: service_started
+  
+networks:
+  apim:
+    name: apim
